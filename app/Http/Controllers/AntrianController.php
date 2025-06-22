@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Antrian;
-use App\Models\Doctor; 
+use App\Models\Queue;
+use App\Models\Service; 
+use App\Models\Patient;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Barryvdh\DomPDF\Facade\Pdf; // Import untuk PDF
+use Illuminate\Support\Facades\Schema;
 
 class AntrianController extends Controller
 {
@@ -16,11 +18,21 @@ class AntrianController extends Controller
      */
     public function index(Request $request)
     {
-        // Antrian terbaru user - DENGAN RELATIONSHIP
-        $antrianTerbaru = Antrian::with(['user', 'doctor'])
-                                ->where('user_id', Auth::id())
-                                ->latest()
-                                ->first();
+        // Cari antrian terbaru user berdasarkan data patient yang terhubung dengan user
+        $user = Auth::user();
+        
+        // Cari patient yang terkait dengan user (berdasarkan nama atau email)
+        $patient = Patient::where('name', 'like', '%' . $user->name . '%')
+                         ->orWhere('phone', $user->phone)
+                         ->first();
+
+        $antrianTerbaru = null;
+        if ($patient) {
+            $antrianTerbaru = Queue::with(['service', 'counter', 'patient'])
+                                  ->where('patient_id', $patient->id)
+                                  ->latest()
+                                  ->first();
+        }
 
         return view('antrian.index', compact('antrianTerbaru'));
     }
@@ -30,22 +42,46 @@ class AntrianController extends Controller
      */
     public function create()
     {
-        // PERBAIKAN: Cek apakah user sudah punya antrian aktif (EXCLUDE yang dibatalkan)
-        $existingAntrian = Antrian::where('user_id', Auth::id())
-                                 ->whereIn('status', ['menunggu', 'dipanggil']) // HANYA status aktif
-                                 ->whereDate('tanggal', '>=', today())
+        // Cek apakah user sudah punya antrian aktif
+        $user = Auth::user();
+        $patient = Patient::where('name', 'like', '%' . $user->name . '%')
+                         ->orWhere('phone', $user->phone)
+                         ->first();
+
+        if ($patient) {
+            $existingQueue = Queue::where('patient_id', $patient->id)
+                                 ->whereIn('status', ['waiting', 'serving'])
+                                 ->whereDate('created_at', today())
                                  ->first();
 
-        if ($existingAntrian) {
-            return redirect()->route('antrian.index')->withErrors([
-                'error' => 'Anda masih memiliki antrian aktif. Harap batalkan atau selesaikan antrian tersebut terlebih dahulu.'
-            ]);
+            if ($existingQueue) {
+                return redirect()->route('antrian.index')->withErrors([
+                    'error' => 'Anda masih memiliki antrian aktif. Harap selesaikan antrian tersebut terlebih dahulu.'
+                ]);
+            }
         }
 
-        $doctors = Doctor::all();
-        $poli = DB::table('poli')->get();
+        $services = Service::where('is_active', true)->get();
         
-        return view('antrian.ambil', compact('doctors', 'poli'));
+        // Ambil data dokter dari tabel doctor_schedules
+        $doctors = collect(); // Default empty collection
+        
+        try {
+            // Mengambil dari tabel doctor_schedules berdasarkan screenshot database Anda
+            $doctors = DB::table('doctor_schedules')
+                        ->where('is_active', true)
+                        ->get();
+        } catch (\Exception $e) {
+            // Jika tabel doctor_schedules tidak ada, coba doctors
+            try {
+                $doctors = DB::table('doctors')->where('is_active', true)->get();
+            } catch (\Exception $e2) {
+                // Jika kedua tabel tidak ada, gunakan collection kosong
+                $doctors = collect();
+            }
+        }
+        
+        return view('antrian.ambil', compact('services', 'doctors'));
     }
 
     /**
@@ -53,122 +89,94 @@ class AntrianController extends Controller
      */
     public function store(Request $request)
     {
-        // Validasi input - SEDERHANA, tanpa keluhan
+        // Validasi input
         $request->validate([
             'name' => 'required|string|max:255',
             'phone' => 'required|string|max:15',
-            'gender' => 'required|in:Laki-laki,Perempuan',
-            'poli' => 'required|string',
-            'doctor_id' => 'required|exists:doctors,doctor_id',
-            'tanggal' => 'required|date|after_or_equal:today',
+            'gender' => 'required|in:male,female',
+            'birth_date' => 'required|date',
+            'address' => 'required|string|max:500',
+            'service_id' => 'required|exists:services,id',
+            'doctor_id' => 'nullable|exists:doctor_schedules,id', // Sesuaikan dengan tabel yang benar
         ], [
             'name.required' => 'Nama harus diisi',
             'phone.required' => 'Nomor telepon harus diisi',
             'gender.required' => 'Jenis kelamin harus dipilih',
-            'poli.required' => 'Poli harus dipilih',
-            'doctor_id.required' => 'Dokter harus dipilih',
-            'tanggal.required' => 'Tanggal harus diisi',
-            'tanggal.after_or_equal' => 'Tanggal tidak boleh kurang dari hari ini',
+            'birth_date.required' => 'Tanggal lahir harus diisi',
+            'address.required' => 'Alamat harus diisi',
+            'service_id.required' => 'Layanan harus dipilih',
+            'doctor_id.exists' => 'Dokter yang dipilih tidak valid',
         ]);
 
         try {
-            // PERBAIKAN: Hanya cek apakah user punya antrian aktif yang belum selesai
-            $activeAntrian = Antrian::where('user_id', Auth::id())
-                                   ->whereIn('status', ['menunggu', 'dipanggil'])
-                                   ->whereDate('tanggal', '>=', today())
-                                   ->first();
+            DB::beginTransaction();
 
-            if ($activeAntrian) {
+            // 1. Cari atau buat patient baru
+            $patient = Patient::where('name', $request->name)
+                             ->where('phone', $request->phone)
+                             ->first();
+
+            if (!$patient) {
+                $patient = Patient::create([
+                    'medical_record_number' => $this->generateMedicalRecordNumber(),
+                    'name' => $request->name,
+                    'birth_date' => $request->birth_date,
+                    'gender' => $request->gender,
+                    'address' => $request->address,
+                    'phone' => $request->phone,
+                ]);
+            }
+
+            // 2. Cek apakah patient sudah punya antrian aktif
+            $existingQueue = Queue::where('patient_id', $patient->id)
+                                 ->whereIn('status', ['waiting', 'serving'])
+                                 ->whereDate('created_at', today())
+                                 ->first();
+
+            if ($existingQueue) {
+                DB::rollBack();
                 return back()->withErrors([
-                    'error' => 'Anda masih memiliki antrian aktif. Harap selesaikan atau batalkan antrian tersebut terlebih dahulu.'
+                    'error' => 'Anda sudah memiliki antrian aktif hari ini.'
                 ])->withInput();
             }
 
-            // Generate nomor antrian dan urutan
-            $noAntrian = Antrian::generateNoAntrian($request->poli, $request->tanggal);
-            $urutan = Antrian::generateUrutan($request->poli, $request->tanggal);
+            // 3. Generate nomor antrian
+            $queueNumber = $this->generateQueueNumber($request->service_id);
 
-            // Buat antrian baru - SEDERHANA, hanya field yang diperlukan
-            Antrian::create([
-                'user_id' => Auth::id(),
-                'name' => $request->name,
-                'phone' => $request->phone,
-                'gender' => $request->gender,
-                'no_antrian' => $noAntrian,
-                'urutan' => $urutan,
-                'poli' => $request->poli,
-                'doctor_id' => $request->doctor_id,
-                'tanggal' => $request->tanggal,
-                'status' => 'menunggu',
-            ]);
+            // 4. Buat antrian baru
+            $queueData = [
+                'service_id' => $request->service_id,
+                'patient_id' => $patient->id,
+                'number' => $queueNumber,
+                'status' => 'waiting',
+            ];
+
+            // Tambahkan doctor_id jika ada dan valid
+            if ($request->filled('doctor_id')) {
+                // Cek apakah kolom doctor_id ada di tabel queues
+                if (Schema::hasColumn('queues', 'doctor_id')) {
+                    $queueData['doctor_id'] = $request->doctor_id;
+                }
+            }
+
+            $queue = Queue::create($queueData);
+
+            // 5. Simpan relasi user dengan patient (untuk tracking)
+            if (!$patient->users()->where('user_id', Auth::id())->exists()) {
+                $patient->users()->attach(Auth::id());
+            }
+
+            DB::commit();
 
             return redirect()->route('antrian.index')->with('success', 
-                'Antrian berhasil dibuat! Nomor antrian Anda: ' . $noAntrian
+                'Antrian berhasil dibuat! Nomor antrian Anda: ' . $queueNumber
             );
 
         } catch (\Exception $e) {
-            // Log error untuk debugging
-            \Log::error('Error creating antrian: ' . $e->getMessage());
-            
+            DB::rollBack();
             return back()->withErrors([
-                'error' => 'Terjadi kesalahan saat membuat antrian: ' . $e->getMessage()
+                'error' => 'Terjadi kesalahan saat membuat antrian. Silakan coba lagi.'
             ])->withInput();
-        }
-    }
-
-    /**
-     * Print tiket antrian (HTML View)
-     */
-    public function print($id)
-    {
-        $antrian = Antrian::with(['user', 'doctor'])->findOrFail($id);
-        
-        // Pastikan user hanya bisa print antrian mereka sendiri
-        if (Auth::id() !== $antrian->user_id) {
-            abort(403, 'Unauthorized action.');
-        }
-
-        return view('antrian.print', compact('antrian'));
-    }
-
-    /**
-     * Download tiket antrian sebagai PDF
-     */
-    public function downloadPdf($id)
-    {
-        $antrian = Antrian::with(['user', 'doctor'])->findOrFail($id);
-        
-        // Pastikan user hanya bisa download antrian mereka sendiri
-        if (Auth::id() !== $antrian->user_id) {
-            abort(403, 'Unauthorized action.');
-        }
-
-        // VALIDASI: Antrian yang dibatalkan tidak bisa di-download
-        if ($antrian->status === 'dibatalkan') {
-            return redirect()->route('antrian.index')->withErrors([
-                'error' => 'Tidak dapat mengunduh tiket antrian yang sudah dibatalkan.'
-            ]);
-        }
-
-        try {
-            // Generate PDF dengan template khusus
-            $pdf = Pdf::loadView('antrian.pdf', compact('antrian'))
-                      ->setPaper([0, 0, 283.46, 566.93], 'portrait') // Ukuran setengah A4
-                      ->setOptions([
-                          'dpi' => 150,
-                          'defaultFont' => 'sans-serif',
-                          'isHtml5ParserEnabled' => true,
-                          'isRemoteEnabled' => false, // Keamanan
-                      ]);
-
-            $filename = 'tiket-antrian-' . $antrian->no_antrian . '-' . date('Ymd-His') . '.pdf';
-            
-            return $pdf->download($filename);
-
-        } catch (\Exception $e) {
-            return back()->withErrors([
-                'error' => 'Gagal membuat PDF. Silakan coba lagi.'
-            ]);
         }
     }
 
@@ -177,118 +185,19 @@ class AntrianController extends Controller
      */
     public function show($id)
     {
-        $antrian = Antrian::with(['user', 'doctor'])->findOrFail($id);
+        $queue = Queue::with(['service', 'counter', 'patient'])->findOrFail($id);
         
         // Pastikan user hanya bisa lihat antrian mereka sendiri
-        if (Auth::id() !== $antrian->user_id) {
+        $user = Auth::user();
+        $hasAccess = $queue->patient->users()->where('user_id', $user->id)->exists() ||
+                    $queue->patient->name === $user->name ||
+                    $queue->patient->phone === $user->phone;
+
+        if (!$hasAccess) {
             abort(403, 'Unauthorized action.');
         }
 
-        return view('antrian.show', compact('antrian'));
-    }
-
-    /**
-     * Form edit antrian
-     */
-    public function edit($id)
-    {
-        $antrian = Antrian::with(['user', 'doctor'])->findOrFail($id); // Load relationship
-        
-        // Pastikan user hanya bisa edit antrian mereka sendiri
-        if (Auth::id() !== $antrian->user_id) {
-            abort(403, 'Unauthorized action.');
-        }
-
-        // Check apakah masih bisa diedit
-        if (!$antrian->canEdit()) {
-            return redirect()->route('antrian.index')
-                           ->withErrors(['error' => 'Antrian tidak dapat diedit karena sudah melewati batas waktu atau status tidak memungkinkan.']);
-        }
-
-        $doctors = Doctor::all();
-        $poli = DB::table('poli')->get();
-        
-        return view('antrian.edit', compact('antrian', 'doctors', 'poli'));
-    }
-
-    /**
-     * Update antrian
-     */
-    public function update(Request $request, $id)
-    {
-        $antrian = Antrian::findOrFail($id);
-        
-        // Pastikan user hanya bisa update antrian mereka sendiri
-        if (Auth::id() !== $antrian->user_id) {
-            abort(403, 'Unauthorized action.');
-        }
-
-        // Check apakah masih bisa diedit
-        if (!$antrian->canEdit()) {
-            return redirect()->route('antrian.index')
-                           ->withErrors(['error' => 'Antrian tidak dapat diedit karena sudah melewati batas waktu atau status tidak memungkinkan.']);
-        }
-
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'phone' => 'required|string|max:15',
-            'gender' => 'required|in:Laki-laki,Perempuan',
-            'poli' => 'required|string',
-            'doctor_id' => 'required|exists:doctors,doctor_id',
-            'tanggal' => 'required|date|after_or_equal:today',
-        ], [
-            'name.required' => 'Nama harus diisi',
-            'phone.required' => 'Nomor telepon harus diisi',
-            'gender.required' => 'Jenis kelamin harus dipilih',
-            'poli.required' => 'Poli harus dipilih',
-            'doctor_id.required' => 'Dokter harus dipilih',
-            'tanggal.required' => 'Tanggal harus diisi',
-            'tanggal.after_or_equal' => 'Tanggal tidak boleh kurang dari hari ini',
-        ]);
-
-        try {
-            // PERBAIKAN: Cek apakah ada antrian aktif lain (selain antrian yang sedang diedit)
-            $conflictAntrian = Antrian::where('user_id', Auth::id())
-                                     ->whereIn('status', ['menunggu', 'dipanggil'])
-                                     ->where('id', '!=', $id) // Exclude current antrian
-                                     ->first();
-
-            if ($conflictAntrian) {
-                return back()->withErrors([
-                    'error' => 'Anda masih memiliki antrian aktif lainnya. Selesaikan atau batalkan antrian tersebut terlebih dahulu.'
-                ])->withInput();
-            }
-
-            $updateData = [
-                'name' => $request->name,
-                'phone' => $request->phone,
-                'gender' => $request->gender,
-                'poli' => $request->poli,
-                'doctor_id' => $request->doctor_id,
-                'tanggal' => $request->tanggal,
-            ];
-
-            // PERBAIKAN: Hanya generate ulang nomor antrian jika BENAR-BENAR DIPERLUKAN
-            // Yaitu jika poli ATAU tanggal berubah
-            $poliChanged = $antrian->poli !== $request->poli;
-            $tanggalChanged = $antrian->tanggal->format('Y-m-d') !== $request->tanggal;
-
-            if ($poliChanged || $tanggalChanged) {
-                // Hanya generate ulang jika poli atau tanggal benar-benar berubah
-                $updateData['no_antrian'] = Antrian::generateNoAntrian($request->poli, $request->tanggal);
-                $updateData['urutan'] = Antrian::generateUrutan($request->poli, $request->tanggal);
-            }
-            // Jika poli dan tanggal tidak berubah, TETAP pakai nomor antrian dan urutan lama
-
-            $antrian->update($updateData);
-
-            return redirect()->route('antrian.index')->with('success', 'Antrian berhasil diperbarui!');
-
-        } catch (\Exception $e) {
-            return back()->withErrors([
-                'error' => 'Terjadi kesalahan saat memperbarui antrian: ' . $e->getMessage()
-            ])->withInput();
-        }
+        return view('antrian.show', compact('queue'));
     }
 
     /**
@@ -296,29 +205,71 @@ class AntrianController extends Controller
      */
     public function destroy($id)
     {
-        $antrian = Antrian::findOrFail($id);
+        $queue = Queue::findOrFail($id);
         
-        // Pastikan user hanya bisa hapus antrian mereka sendiri
-        if (Auth::id() !== $antrian->user_id) {
+        // Pastikan user hanya bisa batalkan antrian mereka sendiri
+        $user = Auth::user();
+        $hasAccess = $queue->patient->users()->where('user_id', $user->id)->exists() ||
+                    $queue->patient->name === $user->name ||
+                    $queue->patient->phone === $user->phone;
+
+        if (!$hasAccess) {
             abort(403, 'Unauthorized action.');
         }
 
         // Check apakah masih bisa dibatalkan
-        if (!$antrian->canCancel()) {
+        if (!in_array($queue->status, ['waiting'])) {
             return redirect()->route('antrian.index')
-                           ->withErrors(['error' => 'Antrian tidak dapat dibatalkan karena sudah melewati batas waktu atau status tidak memungkinkan.']);
+                           ->withErrors(['error' => 'Antrian tidak dapat dibatalkan karena sudah dipanggil atau selesai.']);
         }
 
         try {
-            // Update status menjadi dibatalkan (soft cancel, tidak delete)
-            $antrian->update(['status' => 'dibatalkan']);
+            // Update status menjadi dibatalkan
+            $queue->update([
+                'status' => 'canceled',
+                'canceled_at' => now()
+            ]);
             
             return redirect()->route('antrian.index')->with('success', 'Antrian berhasil dibatalkan!');
             
         } catch (\Exception $e) {
             return back()->withErrors([
-                'error' => 'Terjadi kesalahan saat membatalkan antrian: ' . $e->getMessage()
+                'error' => 'Terjadi kesalahan saat membatalkan antrian.'
             ]);
         }
+    }
+
+    /**
+     * Generate Medical Record Number
+     */
+    private function generateMedicalRecordNumber()
+    {
+        $date = now()->format('Ymd');
+        $lastPatient = Patient::whereDate('created_at', today())
+                             ->orderBy('id', 'desc')
+                             ->first();
+        
+        $sequence = $lastPatient ? 
+                   (int) substr($lastPatient->medical_record_number, -3) + 1 : 1;
+        
+        return 'MR' . $date . sprintf('%03d', $sequence);
+    }
+
+    /**
+     * Generate Queue Number
+     */
+    private function generateQueueNumber($serviceId)
+    {
+        $service = Service::findOrFail($serviceId);
+        
+        $lastQueue = Queue::where('service_id', $serviceId)
+                         ->whereDate('created_at', today())
+                         ->orderBy('id', 'desc')
+                         ->first();
+        
+        $sequence = $lastQueue ? 
+                   (int) substr($lastQueue->number, strlen($service->prefix)) + 1 : 1;
+        
+        return $service->prefix . sprintf('%0' . $service->padding . 'd', $sequence);
     }
 }

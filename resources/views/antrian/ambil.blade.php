@@ -50,34 +50,64 @@
                     <div class="form-group">
                         <label for="name" class="form-label">Nama Lengkap</label>
                         <input type="text" 
-                               class="form-input readonly-input" 
+                               class="form-input" 
                                id="name" 
                                name="name" 
                                value="{{ old('name', Auth::user()->name) }}" 
-                               readonly 
-                               tabindex="-1">
+                               required>
                     </div>
 
                     <div class="form-group">
                         <label for="phone" class="form-label">Nomor HP</label>
                         <input type="text" 
-                               class="form-input readonly-input" 
+                               class="form-input" 
                                id="phone" 
                                name="phone" 
                                value="{{ old('phone', Auth::user()->phone) }}" 
-                               readonly 
-                               tabindex="-1">
+                               required>
                     </div>
 
                     <div class="form-group">
                         <label for="gender" class="form-label">Jenis Kelamin</label>
-                        <input type="text" 
-                               class="form-input readonly-input" 
-                               id="gender" 
-                               name="gender" 
-                               value="{{ old('gender', Auth::user()->gender) }}" 
-                               readonly 
-                               tabindex="-1">
+                        <div class="custom-dropdown" data-name="gender">
+                            <div class="dropdown-trigger @error('gender') is-invalid @enderror" id="gender-trigger">
+                                <span class="dropdown-text">-- Pilih Jenis Kelamin --</span>
+                                <i class="fas fa-chevron-down dropdown-icon"></i>
+                            </div>
+                            <div class="dropdown-menu" id="gender-menu">
+                                <div class="dropdown-options">
+                                    <div class="dropdown-option" data-value="male">
+                                        <span>Laki-laki</span>
+                                    </div>
+                                    <div class="dropdown-option" data-value="female">
+                                        <span>Perempuan</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <input type="hidden" name="gender" id="gender" value="{{ old('gender') }}" required>
+                        </div>
+                        @error('gender')
+                            <div class="form-error">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div class="form-group">
+                        <label for="birth_date" class="form-label">Tanggal Lahir</label>
+                        <input type="date" 
+                               class="form-input" 
+                               id="birth_date" 
+                               name="birth_date" 
+                               value="{{ old('birth_date') }}" 
+                               required>
+                    </div>
+
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label for="address" class="form-label">Alamat</label>
+                        <textarea class="form-input" 
+                                  id="address" 
+                                  name="address" 
+                                  rows="3" 
+                                  required>{{ old('address') }}</textarea>
                     </div>
                 </div>
             </div>
@@ -85,33 +115,36 @@
             <div class="form-section">
                 <h6 class="form-section-title">
                     <i class="fas fa-stethoscope"></i>
-                    Informasi Medis
+                    Informasi Layanan
                 </h6>
                 
                 <div class="form-grid">
                     <div class="form-group">
-                        <label for="poli" class="form-label">Poli</label>
-                        <div class="custom-dropdown" data-name="poli">
-                            <div class="dropdown-trigger @error('poli') is-invalid @enderror" id="poli-trigger">
-                                <span class="dropdown-text">-- Pilih Poli --</span>
+                        <label for="service_id" class="form-label">Layanan</label>
+                        <div class="custom-dropdown" data-name="service_id">
+                            <div class="dropdown-trigger @error('service_id') is-invalid @enderror" id="service-trigger">
+                                <span class="dropdown-text">-- Pilih Layanan --</span>
                                 <i class="fas fa-chevron-down dropdown-icon"></i>
                             </div>
-                            <div class="dropdown-menu" id="poli-menu">
+                            <div class="dropdown-menu" id="service-menu">
                                 <div class="dropdown-search">
-                                    <input type="text" placeholder="Cari poli..." class="search-input">
+                                    <input type="text" placeholder="Cari layanan..." class="search-input">
                                     <i class="fas fa-search search-icon"></i>
                                 </div>
                                 <div class="dropdown-options">
-                                    @foreach($poli as $p)
-                                        <div class="dropdown-option" data-value="{{ $p->nama }}">
-                                            <span>{{ $p->nama }}</span>
+                                    @foreach($services as $service)
+                                        <div class="dropdown-option" data-value="{{ $service->id }}" data-text="{{ $service->name }}">
+                                            <div class="service-info">
+                                                <span class="service-name">{{ $service->name }}</span>
+                                                <span class="service-prefix">Kode: {{ $service->prefix }}</span>
+                                            </div>
                                         </div>
                                     @endforeach
                                 </div>
                             </div>
-                            <input type="hidden" name="poli" id="poli" value="{{ old('poli') }}" required>
+                            <input type="hidden" name="service_id" id="service_id" value="{{ old('service_id') }}" required>
                         </div>
-                        @error('poli')
+                        @error('service_id')
                             <div class="form-error">{{ $message }}</div>
                         @enderror
                     </div>
@@ -129,14 +162,28 @@
                                     <i class="fas fa-search search-icon"></i>
                                 </div>
                                 <div class="dropdown-options">
-                                    @foreach($doctors as $doctor)
-                                        <div class="dropdown-option" data-value="{{ $doctor->doctor_id }}" data-text="{{ $doctor->nama }} - ({{ $doctor->mulai_praktek }} - {{ $doctor->selesai_praktek }})">
-                                            <div class="doctor-info">
-                                                <span class="doctor-name">{{ $doctor->nama }}</span>
-                                                <span class="doctor-time">{{ $doctor->mulai_praktek }} - {{ $doctor->selesai_praktek }}</span>
+                                    @if(isset($doctors) && $doctors->count() > 0)
+                                        @foreach($doctors as $doctor)
+                                            <div class="dropdown-option" data-value="{{ $doctor->id }}" data-text="{{ $doctor->doctor_name }}">
+                                                <div class="doctor-info">
+                                                    <span class="doctor-name">{{ $doctor->doctor_name }}</span>
+                                                    @if(isset($doctor->service_id))
+                                                        <span class="doctor-specialization">Service ID: {{ $doctor->service_id }}</span>
+                                                    @endif
+                                                    @if(isset($doctor->start_time) && isset($doctor->end_time))
+                                                        <span class="doctor-time">{{ $doctor->start_time }} - {{ $doctor->end_time }}</span>
+                                                    @endif
+                                                    @if(isset($doctor->day_of_week))
+                                                        <span class="doctor-day">{{ ucfirst($doctor->day_of_week) }}</span>
+                                                    @endif
+                                                </div>
                                             </div>
+                                        @endforeach
+                                    @else
+                                        <div class="dropdown-option" data-value="" data-text="Tidak ada dokter tersedia">
+                                            <span>Tidak ada dokter tersedia</span>
                                         </div>
-                                    @endforeach
+                                    @endif
                                 </div>
                             </div>
                             <input type="hidden" name="doctor_id" id="doctor_id" value="{{ old('doctor_id') }}" required>
@@ -149,7 +196,7 @@
                     <div class="form-group">
                         <label for="tanggal_antrian_display" class="form-label">Tanggal Antrian</label>
                         <div id="tanggal-antrian-picker" class="tanggal-antrian-picker">
-                            </div>
+                        </div>
                         <input type="hidden" name="tanggal" id="tanggal" value="{{ old('tanggal') }}" required>
                         @error('tanggal')
                             <div class="form-error">{{ $message }}</div>
@@ -222,7 +269,7 @@
 
 /* Ensure the date picker fills the grid column */
 .form-group:has(.tanggal-antrian-picker) {
-    grid-column: span 2; /* Span full width on larger screens */
+    grid-column: span 3; /* Span full width on larger screens since we have 3 fields now */
 }
 
 @media (max-width: 768px) {
@@ -385,7 +432,7 @@
     font-size: 16px;
 }
 
-/* Custom Dropdown Styles (untuk Pilih Poli/Dokter) */
+/* Custom Dropdown Styles (untuk Pilih Service/Gender) */
 .custom-dropdown {
     position: relative;
     width: 100%;
@@ -520,23 +567,35 @@
     display: none;
 }
 
+.custom-dropdown .service-info,
 .custom-dropdown .doctor-info {
     display: flex;
     flex-direction: column;
     gap: 2px;
 }
 
+.custom-dropdown .service-name,
 .custom-dropdown .doctor-name {
     font-weight: 500;
     font-size: 14px;
 }
 
-.custom-dropdown .doctor-time {
+.custom-dropdown .service-prefix {
     font-size: 12px;
     color: #7f8c8d;
 }
 
-.custom-dropdown .dropdown-option.selected .doctor-time {
+.custom-dropdown .doctor-specialization,
+.custom-dropdown .doctor-time,
+.custom-dropdown .doctor-day {
+    font-size: 12px;
+    color: #7f8c8d;
+}
+
+.custom-dropdown .dropdown-option.selected .service-prefix,
+.custom-dropdown .dropdown-option.selected .doctor-specialization,
+.custom-dropdown .dropdown-option.selected .doctor-time,
+.custom-dropdown .dropdown-option.selected .doctor-day {
     color: rgba(255, 255, 255, 0.8);
 }
 
@@ -596,11 +655,15 @@
         min-height: 60px;
     }
 
+    .custom-dropdown .service-name,
     .custom-dropdown .doctor-name {
         font-size: 15px;
     }
 
-    .custom-dropdown .doctor-time {
+    .custom-dropdown .service-prefix,
+    .custom-dropdown .doctor-specialization,
+    .custom-dropdown .doctor-time,
+    .custom-dropdown .doctor-day {
         font-size: 13px;
     }
 }
@@ -656,21 +719,6 @@
     opacity: 1;
     visibility: visible;
 }
-
-/* Hapus aturan ini yang menyebabkan dropdown profil di tengah */
-/* @media (max-width: 768px) {
-    .dropdown-menu.show {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 90%;
-        max-width: 400px;
-        max-height: 70vh;
-        border-radius: 12px;
-        border: 2px solid #ecf0f1;
-    }
-} */
 </style>
 
 <script>
@@ -681,20 +729,14 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize Custom Dropdowns
     initCustomDropdowns();
 
-    // Disable semua readonly input
-    const readonlyInputs = document.querySelectorAll('.readonly-input');
-    readonlyInputs.forEach(function(input) {
-        input.addEventListener('click', function(e) {
-            e.preventDefault();
-            return false;
-        });
-        
-        input.addEventListener('focus', function(e) {
-            e.preventDefault();
-            this.blur();
-            return false;
-        });
-    });
+    // Set minimum date for birth_date (18 years ago)
+    const birthDateInput = document.getElementById('birth_date');
+    if (birthDateInput) {
+        const eighteenYearsAgo = new Date();
+        eighteenYearsAgo.setFullYear(eighteenYearsAgo.getFullYear() - 18);
+        const maxDate = eighteenYearsAgo.toISOString().split('T')[0];
+        birthDateInput.setAttribute('max', maxDate);
+    }
 
     // Prevent double submission
     if (form) {
@@ -876,7 +918,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-
     // --- Custom Date Picker Logic ---
     const tanggalAntrianPicker = document.getElementById('tanggal-antrian-picker');
     const hiddenTanggalInput = document.getElementById('tanggal'); // The actual input for form submission
@@ -908,7 +949,7 @@ document.addEventListener('DOMContentLoaded', function() {
             dateOption.setAttribute('data-date', dateString);
             dateOption.textContent = displayString;
 
-            // Set selected if it matches the old('tanggal') value or is today initially
+            // Set selected if it matches the old value or is today initially
             if (hiddenTanggalInput.value === dateString) {
                 dateOption.classList.add('selected');
             } else if (!hiddenTanggalInput.value && i === 0) { // Select today by default if no old value
@@ -933,7 +974,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initial render of date options
     renderDateOptions();
 
-    // Re-select the `old('tanggal')` value if it exists after rendering options
+    // Re-select the old value if it exists after rendering options
     if (hiddenTanggalInput.value) {
         const previouslySelected = tanggalAntrianPicker.querySelector(`[data-date="${hiddenTanggalInput.value}"]`);
         if (previouslySelected) {
