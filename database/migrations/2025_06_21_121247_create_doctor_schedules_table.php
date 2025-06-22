@@ -17,7 +17,7 @@ return new class extends Migration
             $table->time('start_time'); // Jam mulai
             $table->time('end_time'); // Jam selesai
             $table->boolean('is_active')->default(true); // Status aktif
-            $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete(); // Link ke user (untuk nanti)
+            $table->string('foto')->nullable(); // <--- tambahkan ini
             $table->timestamps();
             
             // Index untuk performa

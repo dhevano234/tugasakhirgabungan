@@ -14,12 +14,12 @@
         @forelse ($doctors as $doctor)
             <div class="doctor-card animate">
                 <div class="doctor-photo">
-                    <img src="{{ $doctor->foto ? asset($doctor->foto) : asset('assets/img/default-doctor.png') }}"
-                         alt="{{ $doctor->nama }}">
+                    <img src="{{ $doctor->foto ? asset($doctor->foto) : asset('assets/img/doctors/doctors-1.jpg') }}"
+                         alt="{{ $doctor->doctor_name }}">
                 </div>
                 
                 <div class="doctor-info">
-                    <h5>{{ $doctor->nama }}</h5>
+                    <h5>{{ $doctor->doctor_name }}</h5>
                     <span class="badge badge-{{ $doctor->spesialisasi == 'Dokter Umum' ? 'primary' : 'success' }}">
                         {{ $doctor->spesialisasi }}
                     </span>
@@ -27,13 +27,13 @@
                     <div class="schedule-info">
                         <div class="schedule-item">
                             <i class="fas fa-calendar-alt"></i>
-                            <span>{{ $doctor->hari}}</span>
+                            <span>{{ $doctor->day_of_week}}</span>
                         </div>
                         <div class="schedule-item">
                             <i class="fas fa-clock"></i>
                             <span>
-                                {{ \Carbon\Carbon::parse($doctor->mulai_praktek)->format('H:i') }} - 
-                                {{ \Carbon\Carbon::parse($doctor->selesai_praktek)->format('H:i') }} WIB
+                                {{ \Carbon\Carbon::parse($doctor->start_time)->format('H:i') }} - 
+                                {{ \Carbon\Carbon::parse($doctor->end_time)->format('H:i') }} WIB
                             </span>
                         </div>
                     </div>

@@ -16,7 +16,7 @@ class DoctorSchedule extends Model
         'start_time',
         'end_time',
         'is_active',
-        'user_id',
+        'foto'
     ];
 
     protected $casts = [
