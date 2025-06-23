@@ -14,13 +14,18 @@ return new class extends Migration
         Schema::create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('nomor_ktp')->nullable(); // Mengizinkan NULL
             $table->string('email')->unique();
+            $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
-            $table->string('phone')->nullable();
-            $table->date('birth_date')->nullable();
+            
+            // Tambah field profile user (tanpa ->after karena ini create table)
+            $table->enum('role', ['admin', 'dokter', 'user'])->default('user');
+            $table->string('phone', 20)->nullable();
             $table->enum('gender', ['Laki-laki', 'Perempuan'])->nullable();
+            $table->date('birth_date')->nullable();
             $table->text('address')->nullable();
+            $table->string('nomor_ktp', 16)->nullable();
+            
             $table->rememberToken();
             $table->timestamps();
         });

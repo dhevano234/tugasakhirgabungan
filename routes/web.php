@@ -1,4 +1,5 @@
 <?php
+// File: routes/web.php
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\LoginController;
@@ -35,12 +36,12 @@ Route::middleware('guest')->group(function () {
     Route::post('reset-password', [ResetPasswordController::class, 'reset'])->name('password.update');
 });
 
-// Routes Protected by Auth
-Route::middleware('auth')->group(function () {
+// Routes untuk USER/PASIEN SAJA
+Route::middleware(['auth', 'role.user'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/home', [HomeController::class, 'index'])->name('home');
 
-    // Profile Routes - DIPERBAIKI
+    // Profile Routes
     Route::get('/editprofile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/password', [ProfileController::class, 'updatePassword'])->name('password.update');
@@ -48,31 +49,21 @@ Route::middleware('auth')->group(function () {
     // Riwayat Pasien
     Route::get('/riwayatkunjungan', [RiwayatController::class, 'index'])->name('riwayat.index');
 
-    // Antrian Routes
+    // Antrian Routes - HANYA UNTUK USER/PASIEN
     Route::prefix('antrian')->name('antrian.')->group(function () {
         Route::get('/', [AntrianController::class, 'index'])->name('index');
-        
-        // Route untuk membuat antrian baru
-        Route::get('/ambil', [AntrianController::class, 'create'])->name('create');
-        Route::post('/', [AntrianController::class, 'store'])->name('store');
-        
-        // Route untuk detail antrian
-        Route::get('/{id}', [AntrianController::class, 'show'])->name('show');
-        
-        // Route untuk edit antrian
-        Route::get('/{id}/edit', [AntrianController::class, 'edit'])->name('edit');
-        Route::put('/{id}', [AntrianController::class, 'update'])->name('update');
-        
-        // Route untuk batalkan antrian
-        Route::delete('/{id}', [AntrianController::class, 'destroy'])->name('destroy');
-        
-        // Route untuk print tiket (HTML view)
-        Route::get('/{id}/print', [AntrianController::class, 'print'])->name('print');
-        
-        // Route untuk download PDF tiket
-        Route::get('/{id}/download-pdf', [AntrianController::class, 'downloadPdf'])->name('downloadPdf');
+        Route::get('/create', [AntrianController::class, 'create'])->name('create');
+        Route::post('/store', [AntrianController::class, 'store'])->name('store');
+        Route::get('/status/{queue}', [AntrianController::class, 'show'])->name('show');
+        Route::delete('/cancel/{queue}', [AntrianController::class, 'cancel'])->name('cancel');
+        Route::get('/ticket/{queue}', [AntrianController::class, 'ticket'])->name('ticket');
     });
 
-    // Jadwal Dokter
+    // Doctor Info - Untuk pasien lihat info dokter
+    Route::get('/doctors', [DoctorController::class, 'index'])->name('doctors.index');
+    Route::get('/doctors/{schedule}', [DoctorController::class, 'show'])->name('doctors.show');
     Route::get('/jadwaldokter', [DoctorController::class, 'jadwaldokter'])->name('jadwaldokter');
 });
+
+// PENTING: Panel Admin dan Dokter menggunakan middleware di PanelProvider masing-masing
+// Tidak perlu ditambah middleware di web.php karena Filament menghandle sendiri
