@@ -20,8 +20,13 @@ class RegisterController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
+            'nomor_ktp' => 'required|string|size:16|unique:users',
             'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:8|confirmed',
+            'password' => 'required|string|min:6|confirmed',
+            'phone' => 'required|string|max:20|unique:users',
+            'birth_date' => 'nullable|date',
+            'gender' => 'nullable|in:Laki-laki,Perempuan',
+            'address' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -33,8 +38,13 @@ class RegisterController extends Controller
         // Buat user baru dengan role default 'user' (pasien)
         $user = User::create([
             'name' => $request->name,
+            'nomor_ktp' => $request->nomor_ktp,
             'email' => $request->email,
             'password' => Hash::make($request->password),
+            'phone' => $request->phone,
+            'birth_date' => $request->birth_date,
+            'gender' => $request->gender,
+            'address' => $request->address,
             'role' => 'user', // Default role untuk registrasi publik
         ]);
 

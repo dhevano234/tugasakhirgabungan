@@ -94,16 +94,12 @@ class AntrianController extends Controller
             'name' => 'required|string|max:255',
             'phone' => 'required|string|max:15',
             'gender' => 'required|in:male,female',
-            'birth_date' => 'required|date',
-            'address' => 'required|string|max:500',
             'service_id' => 'required|exists:services,id',
             'doctor_id' => 'nullable|exists:doctor_schedules,id', // Sesuaikan dengan tabel yang benar
         ], [
             'name.required' => 'Nama harus diisi',
             'phone.required' => 'Nomor telepon harus diisi',
             'gender.required' => 'Jenis kelamin harus dipilih',
-            'birth_date.required' => 'Tanggal lahir harus diisi',
-            'address.required' => 'Alamat harus diisi',
             'service_id.required' => 'Layanan harus dipilih',
             'doctor_id.exists' => 'Dokter yang dipilih tidak valid',
         ]);

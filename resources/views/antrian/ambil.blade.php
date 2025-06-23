@@ -36,7 +36,7 @@
         </div>
     @endif
 
-    <div class="form-card animate">
+    <div class="form-card">
         <form action="{{ route('antrian.store') }}" method="POST" id="antrianForm">
             @csrf
             
@@ -44,70 +44,55 @@
                 <h6 class="form-section-title">
                     <i class="fas fa-user"></i>
                     Informasi Personal
+                    <small style="color: #7f8c8d; font-weight: normal; font-size: 0.85rem;">
+                        (Data diambil dari profil Anda)
+                    </small>
                 </h6>
                 
                 <div class="form-grid">
                     <div class="form-group">
                         <label for="name" class="form-label">Nama Lengkap</label>
                         <input type="text" 
-                               class="form-input" 
+                               class="form-input readonly-input" 
                                id="name" 
                                name="name" 
-                               value="{{ old('name', Auth::user()->name) }}" 
-                               required>
+                               value="{{ Auth::user()->name }}" 
+                               readonly
+                               tabindex="-1">
                     </div>
 
                     <div class="form-group">
                         <label for="phone" class="form-label">Nomor HP</label>
                         <input type="text" 
-                               class="form-input" 
+                               class="form-input readonly-input" 
                                id="phone" 
                                name="phone" 
-                               value="{{ old('phone', Auth::user()->phone) }}" 
-                               required>
+                               value="{{ Auth::user()->phone ?? 'Belum diisi di profil' }}" 
+                               readonly
+                               tabindex="-1">
+                        @if(!Auth::user()->phone)
+                            <div class="form-helper">
+                                <i class="fas fa-info-circle"></i>
+                                <span>Silakan update nomor HP Anda di <a href="{{ route('profile.edit') }}">profil</a></span>
+                            </div>
+                        @endif
                     </div>
 
                     <div class="form-group">
                         <label for="gender" class="form-label">Jenis Kelamin</label>
-                        <div class="custom-dropdown" data-name="gender">
-                            <div class="dropdown-trigger @error('gender') is-invalid @enderror" id="gender-trigger">
-                                <span class="dropdown-text">-- Pilih Jenis Kelamin --</span>
-                                <i class="fas fa-chevron-down dropdown-icon"></i>
+                        <input type="text" 
+                               class="form-input readonly-input" 
+                               id="gender_display" 
+                               value="{{ Auth::user()->gender ?? 'Belum diisi di profil' }}" 
+                               readonly
+                               tabindex="-1">
+                        <input type="hidden" name="gender" value="{{ Auth::user()->gender }}">
+                        @if(!Auth::user()->gender)
+                            <div class="form-helper">
+                                <i class="fas fa-info-circle"></i>
+                                <span>Silakan update jenis kelamin Anda di <a href="{{ route('profile.edit') }}">profil</a></span>
                             </div>
-                            <div class="dropdown-menu" id="gender-menu">
-                                <div class="dropdown-options">
-                                    <div class="dropdown-option" data-value="male">
-                                        <span>Laki-laki</span>
-                                    </div>
-                                    <div class="dropdown-option" data-value="female">
-                                        <span>Perempuan</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <input type="hidden" name="gender" id="gender" value="{{ old('gender') }}" required>
-                        </div>
-                        @error('gender')
-                            <div class="form-error">{{ $message }}</div>
-                        @enderror
-                    </div>
-
-                    <div class="form-group">
-                        <label for="birth_date" class="form-label">Tanggal Lahir</label>
-                        <input type="date" 
-                               class="form-input" 
-                               id="birth_date" 
-                               name="birth_date" 
-                               value="{{ old('birth_date') }}" 
-                               required>
-                    </div>
-
-                    <div class="form-group" style="grid-column: span 2;">
-                        <label for="address" class="form-label">Alamat</label>
-                        <textarea class="form-input" 
-                                  id="address" 
-                                  name="address" 
-                                  rows="3" 
-                                  required>{{ old('address') }}</textarea>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -216,6 +201,7 @@
                 </a>
             </div>
         </form>
+    </div>
     </div>
 </main>
 
