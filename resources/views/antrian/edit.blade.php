@@ -40,7 +40,7 @@
 
     <!-- Form Card -->
     <div class="form-card animate">
-        <form action="{{ route('antrian.update', $antrian->id) }}" method="POST" id="editAntrianForm">
+        <form action="{{ route('antrian.update', $queue->id) }}" method="POST" id="editAntrianForm">
             @csrf
             @method('PUT')
 
@@ -58,7 +58,7 @@
                         <input type="text"
                                class="form-input readonly-input"
                                id="no_antrian"
-                               value="{{ $antrian->no_antrian }}"
+                               value="{{ $queue->number }}"
                                readonly
                                tabindex="-1">
                         <small class="form-help">Nomor antrian tidak dapat diubah</small>
@@ -81,7 +81,7 @@
                                class="form-input readonly-input"
                                id="name"
                                name="name"
-                               value="{{ old('name', $antrian->name) }}"
+                               value="{{ old('name', $queue->name) }}"
                                readonly
                                tabindex="-1">
                     </div>
@@ -93,7 +93,7 @@
                                class="form-input readonly-input"
                                id="phone"
                                name="phone"
-                               value="{{ old('phone', $antrian->phone) }}"
+                               value="{{ old('phone', $queue->phone) }}"
                                readonly
                                tabindex="-1">
                     </div>
@@ -105,7 +105,7 @@
                                class="form-input readonly-input"
                                id="gender"
                                name="gender"
-                               value="{{ old('gender', $antrian->gender) }}"
+                               value="{{ old('gender', $queue->gender) }}"
                                readonly
                                tabindex="-1">
                     </div>
@@ -128,9 +128,9 @@
                                 name="poli"
                                 required>
                             <option value="">-- Pilih Poli --</option>
-                            @foreach($poli as $p)
+                            @foreach($services as $p)
                                 <option value="{{ $p->nama }}"
-                                        {{ old('poli', $antrian->poli) == $p->nama ? 'selected' : '' }}>
+                                        {{ old('poli', $queue->poli) == $p->nama ? 'selected' : '' }}>
                                     {{ $p->nama }}
                                 </option>
                             @endforeach
@@ -151,7 +151,7 @@
                             @foreach($doctors as $doctor)
                                 <option value="{{ $doctor->doctor_id }}"
                                         data-specialization="{{ $doctor->spesialisasi }}"
-                                        {{ old('doctor_id', $antrian->doctor_id) == $doctor->doctor_id ? 'selected' : '' }}>
+                                        {{ old('doctor_id', $queue->doctor_id) == $doctor->doctor_id ? 'selected' : '' }}>
                                     {{ $doctor->nama }} - {{ $doctor->spesialisasi }}
                                 </option>
                             @endforeach
@@ -168,7 +168,7 @@
                             {{-- Date options will be rendered here by JavaScript --}}
                         </div>
                         {{-- Hidden input to store the selected date value for form submission --}}
-                        <input type="hidden" name="tanggal" id="tanggal" value="{{ old('tanggal', $antrian->tanggal->format('Y-m-d')) }}" required>
+                        <input type="hidden" name="tanggal" id="tanggal" value="{{ old('tanggal', $queue->tanggal->format('Y-m-d')) }}" required>
                         @error('tanggal')
                             <div class="form-error">{{ $message }}</div>
                         @enderror
@@ -684,7 +684,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initial render of date options
     renderDateOptions();
 
-    // Re-select the `old('tanggal')` value (or the one from $antrian) if it exists
+    // Re-select the `old('tanggal')` value (or the one from $queue) if it exists
     // This part is crucial for making sure the pre-filled date gets selected on the custom picker.
     if (hiddenTanggalInput.value) {
         const previouslySelected = tanggalAntrianPicker.querySelector(`[data-date="${hiddenTanggalInput.value}"]`);
@@ -694,7 +694,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             previouslySelected.classList.add('selected');
         } else {
-            // If the $antrian date is not within the next 7 days, we might need to handle it.
+            // If the $queue date is not within the next 7 days, we might need to handle it.
             // For now, it will default to today. You might consider adding a message or
             // dynamically adding that specific date as an option if it's outside the 7-day range.
             console.warn("Tanggal antrian yang ada tidak ditemukan di pilihan 7 hari ke depan.");

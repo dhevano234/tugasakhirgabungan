@@ -53,11 +53,11 @@
                         <span class="badge badge-primary">{{ $antrianTerbaru->no_antrian }}</span>
                     </div>
                     <div class="antrian-details">
-                        <h6>{{ $antrianTerbaru->name ?? '-' }}</h6>
+                        <h6>{{ $antrianTerbaru->user->name ?? '-' }}</h6>
                         <p><i class="fas fa-map-marker-alt"></i> {{ $antrianTerbaru->user->address ?? '-' }}</p>
                         <div class="detail-row">
-                            <span><i class="fas fa-venus-mars"></i> {{ $antrianTerbaru->gender ?? '-' }}</span>
-                            <span><i class="fas fa-phone"></i> {{ $antrianTerbaru->phone ?? '-' }}</span>
+                            <span><i class="fas fa-venus-mars"></i> {{ $antrianTerbaru->user->gender ?? '-' }}</span>
+                            <span><i class="fas fa-phone"></i> {{ $antrianTerbaru->user->phone ?? '-' }}</span>
                         </div>
                         <div class="detail-row">
                             <span><i class="fas fa-id-card"></i> {{ $antrianTerbaru->user->nomor_ktp ?? '-' }}</span>
@@ -67,7 +67,7 @@
                 
                 <div class="antrian-meta">
                     <div class="poli-info">
-                        <span class="badge badge-{{ $antrianTerbaru->poli == 'Umum' ? 'primary' : 'success' }}">
+                        <span class="badge badge-info{{ $antrianTerbaru->service->name == 'Umum' ? 'primary' : 'success' }}">
                             {{ $antrianTerbaru->poli }}
                         </span>
                         <small>{{ $antrianTerbaru->doctor->nama ?? 'Belum ditentukan' }}</small>

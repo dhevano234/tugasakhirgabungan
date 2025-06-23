@@ -49,15 +49,17 @@ Route::middleware(['auth', 'role.user'])->group(function () {
     // Riwayat Pasien
     Route::get('/riwayatkunjungan', [RiwayatController::class, 'index'])->name('riwayat.index');
 
-    // Antrian Routes - HANYA UNTUK USER/PASIEN
-    Route::prefix('antrian')->name('antrian.')->group(function () {
-        Route::get('/', [AntrianController::class, 'index'])->name('index');
-        Route::get('/create', [AntrianController::class, 'create'])->name('create');
-        Route::post('/store', [AntrianController::class, 'store'])->name('store');
-        Route::get('/status/{queue}', [AntrianController::class, 'show'])->name('show');
-        Route::delete('/cancel/{queue}', [AntrianController::class, 'cancel'])->name('cancel');
-        Route::get('/ticket/{queue}', [AntrianController::class, 'ticket'])->name('ticket');
-    });
+   // routes/web.php - dalam middleware auth dan role.user
+Route::prefix('antrian')->name('antrian.')->group(function () {
+    Route::get('/', [AntrianController::class, 'index'])->name('index');
+    Route::get('/create', [AntrianController::class, 'create'])->name('create');
+    Route::post('/store', [AntrianController::class, 'store'])->name('store');
+    Route::get('/{queue}', [AntrianController::class, 'show'])->name('show');
+    Route::get('/{queue}/edit', [AntrianController::class, 'edit'])->name('edit'); 
+    Route::put('/{queue}', [AntrianController::class, 'update'])->name('update'); 
+    Route::delete('/{queue}', [AntrianController::class, 'destroy'])->name('destroy');
+    Route::get('/{queue}/print', [AntrianController::class, 'print'])->name('print'); 
+});
 
     // Doctor Info - Untuk pasien lihat info dokter
     Route::get('/doctors', [DoctorController::class, 'index'])->name('doctors.index');
