@@ -1,4 +1,5 @@
 <?php
+// File: app/Filament/Pages/QueueKiosk.php
 
 namespace App\Filament\Pages;
 
@@ -26,7 +27,6 @@ class QueueKiosk extends Page
     public function __construct()
     {
         $this->thermalPrinterService = app(ThermalPrinterService::class);
-
         $this->queueService = app(QueueService::class);
     }
 
@@ -39,22 +39,20 @@ class QueueKiosk extends Page
 
     public function print($serviceId)
     {
-        // YANG DIUBAH - Sekarang addQueue akan auto-create patient
-        $newQueue = $this->queueService->addQueue($serviceId);
+        // UBAH: Tambahkan antrian tanpa user (untuk walk-in)
+        $newQueue = $this->queueService->addQueue($serviceId, null); // null = tidak ada user tertentu
         
-        // Get patient info yang baru dibuat
-        $patient = $newQueue->patient;
         $service = $newQueue->service;
 
-        // YANG BARU - Tampilkan notification dengan info patient
+        // Tampilkan notification tanpa info user
         Notification::make()
             ->title('Antrian Berhasil Dibuat!')
-            ->body("Nomor Antrian: {$newQueue->number}\nNo. RM: {$patient->medical_record_number}")
+            ->body("Nomor Antrian: {$newQueue->number}")
             ->success()
             ->duration(10000)
             ->send();
 
-        // YANG DIUBAH - Text untuk thermal printer sekarang include info patient
+        // Text untuk thermal printer
         $text = $this->thermalPrinterService->createText([
             ['text' => 'Klinik Pratama Hadiana Sehat', 'align' => 'center'],
             ['text' => 'Jl. Raya Banjaran Barat No.658A', 'align' => 'center'],
@@ -63,13 +61,10 @@ class QueueKiosk extends Page
             ['text' => $newQueue->number, 'align' => 'center', 'style' => 'double'],
             ['text' => 'Layanan: ' . $service->name, 'align' => 'center'],
             ['text' => '-----------------', 'align' => 'center'],
-            ['text' => 'REKAM MEDIS', 'align' => 'center'],
-            ['text' => $patient->medical_record_number, 'align' => 'center'],
             ['text' => $newQueue->created_at->format('d-M-Y H:i'), 'align' => 'center'],
             ['text' => '-----------------', 'align' => 'center'],
             ['text' => 'Mohon menunggu panggilan', 'align' => 'center'],
-            ['text' => 'Data lengkap akan diisi', 'align' => 'center'],
-            ['text' => 'saat pemeriksaan', 'align' => 'center']
+            ['text' => 'Terima kasih', 'align' => 'center']
         ]);
 
         $this->dispatch("print-start", $text);

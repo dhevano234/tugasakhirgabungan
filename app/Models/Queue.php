@@ -1,4 +1,5 @@
 <?php
+// File: app/Models/Queue.php
 
 namespace App\Models;
 
@@ -11,7 +12,7 @@ class Queue extends Model
     protected $fillable = [
         'counter_id',
         'service_id',
-        'user_id',        // Menggunakan user_id langsung
+        'user_id', // GANTI dari patient_id ke user_id
         'number',
         'status',
         'called_at',
@@ -38,53 +39,46 @@ class Queue extends Model
         return $this->belongsTo(Counter::class);
     }
 
-    // Relationship langsung ke User (bukan Patient)
+    // Relationship ke user (bukan patient)
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * Check if queue can be edited
-     */
-    public function canEdit(): bool
+    // Relationship ke medical record
+    public function medicalRecord(): HasOne
     {
-        return in_array($this->status, ['waiting']) && 
-               $this->created_at->isToday();
+        return $this->hasOne(MedicalRecord::class);
     }
 
-    /**
-     * Check if queue can be cancelled
-     */
+    // Helper methods untuk status
+    public function canEdit(): bool
+    {
+        return in_array($this->status, ['waiting']);
+    }
+
     public function canCancel(): bool
     {
         return in_array($this->status, ['waiting']);
     }
 
-    /**
-     * Check if queue can be printed
-     */
     public function canPrint(): bool
     {
-        return true; // Bisa print kapan saja
+        return in_array($this->status, ['waiting', 'serving', 'finished']);
     }
 
-    /**
-     * Get formatted date
-     */
+    // Accessor untuk format tanggal
     public function getFormattedTanggalAttribute(): string
     {
-        return $this->created_at->format('d/m/Y H:i');
+        return $this->created_at->format('d F Y');
     }
 
-    /**
-     * Get status badge color
-     */
+    // Accessor untuk status badge
     public function getStatusBadgeAttribute(): string
     {
         return match($this->status) {
             'waiting' => 'warning',
-            'serving' => 'info', 
+            'serving' => 'info',
             'finished' => 'success',
             'canceled' => 'danger',
             default => 'secondary'

@@ -5,8 +5,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class User extends Authenticatable
 {
@@ -69,9 +69,25 @@ class User extends Authenticatable
     }
 
     /**
+     * Relationship ke Queue (antrian yang dibuat user)
+     */
+    public function queues(): HasMany
+    {
+        return $this->hasMany(Queue::class);
+    }
+
+    /**
+     * Relationship ke MedicalRecord (sebagai dokter)
+     */
+    public function medicalRecords(): HasMany
+    {
+        return $this->hasMany(MedicalRecord::class, 'doctor_id');
+    }
+
+    /**
      * Cek apakah data profil sudah lengkap untuk buat antrian
      */
-    public function isProfileCompleteForQueue()
+    public function isProfileCompleteForQueue(): bool
     {
         return !empty($this->phone) && 
                !empty($this->gender) && 
@@ -82,7 +98,7 @@ class User extends Authenticatable
     /**
      * Get missing profile data untuk buat antrian
      */
-    public function getMissingProfileData()
+    public function getMissingProfileData(): array
     {
         $missing = [];
         
@@ -97,7 +113,7 @@ class User extends Authenticatable
     /**
      * Check if user is admin
      */
-    public function isAdmin()
+    public function isAdmin(): bool
     {
         return $this->role === 'admin';
     }
@@ -105,7 +121,7 @@ class User extends Authenticatable
     /**
      * Check if user is dokter
      */
-    public function isDokter()
+    public function isDokter(): bool
     {
         return $this->role === 'dokter';
     }
@@ -113,13 +129,30 @@ class User extends Authenticatable
     /**
      * Check if user is pasien/user
      */
-    public function isUser()
+    public function isUser(): bool
     {
         return $this->role === 'user';
     }
 
-        public function medicalRecords(): HasMany
+    /**
+     * Get user's age
+     */
+    public function getAgeAttribute(): ?int
     {
-        return $this->hasMany(MedicalRecord::class, 'doctor_id');
+        return $this->birth_date ? $this->birth_date->diffInYears(now()) : null;
+    }
+
+    /**
+     * Get formatted gender
+     */
+    public function getGenderLabelAttribute(): string
+    {
+        return match($this->gender) {
+            'Laki-laki' => 'Laki-laki',
+            'Perempuan' => 'Perempuan',
+            'male' => 'Laki-laki',
+            'female' => 'Perempuan',
+            default => $this->gender ?? 'Tidak diketahui'
+        };
     }
 }

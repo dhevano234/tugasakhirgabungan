@@ -1,4 +1,6 @@
 <?php
+// File: app/Filament/Dokter/Resources/QueueResource.php
+
 namespace App\Filament\Dokter\Resources;
 
 use App\Filament\Dokter\Resources\QueueResource\Pages;
@@ -40,17 +42,17 @@ class QueueResource extends Resource
                     ->badge()
                     ->color('info'),
                     
-                Tables\Columns\TextColumn::make('patient.name')
+                Tables\Columns\TextColumn::make('user.name')
                     ->label('Nama Pasien')
-                    ->default('Pasien Walk-in')
+                    ->default('Walk-in')
                     ->searchable()
                     ->limit(25)
                     ->formatStateUsing(function ($record) {
-                        if ($record->patient_id && $record->patient) {
-                            return $record->patient->name . 
-                                   "\n(" . $record->patient->medical_record_number . ")";
+                        if ($record->user_id && $record->user) {
+                            return $record->user->name . 
+                                   ($record->user->phone ? "\n(" . $record->user->phone . ")" : "");
                         }
-                        return 'Pasien Walk-in';
+                        return 'Walk-in';
                     })
                     ->wrap(),
                     
@@ -105,7 +107,7 @@ class QueueResource extends Resource
                     ->default(),
             ])
             ->actions([
-                // ===== TOMBOL PANGGIL (RESTORED) =====
+                // ===== TOMBOL PANGGIL =====
                 Action::make('call')
                     ->label('Panggil')
                     ->icon('heroicon-o-megaphone')
@@ -150,7 +152,7 @@ class QueueResource extends Resource
                     ->modalSubmitActionLabel('Ya, Panggil')
                     ->modalCancelActionLabel('Batal'),
 
-                // ===== TOMBOL REKAM MEDIS (TETAP ADA) =====
+                // ===== TOMBOL REKAM MEDIS =====
                 Action::make('create_medical_record')
                     ->label('Rekam Medis')
                     ->icon('heroicon-o-document-plus')
@@ -158,20 +160,20 @@ class QueueResource extends Resource
                     ->size('sm')
                     ->visible(fn (Queue $record) => in_array($record->status, ['serving', 'waiting']))
                     ->action(function (Queue $record) {
-                        // Jika pasien walk-in (tidak ada patient_id), redirect ke form kosong
-                        if (!$record->patient_id) {
+                        // Jika walk-in (tidak ada user_id), redirect ke form kosong
+                        if (!$record->user_id) {
                             return redirect()->route('filament.dokter.resources.medical-records.create');
                         }
 
-                        // Jika ada patient_id, redirect dengan parameter untuk auto-populate
+                        // Jika ada user_id, redirect dengan parameter untuk auto-populate
                         return redirect()->route('filament.dokter.resources.medical-records.create', [
-                            'patient_id' => $record->patient_id,
+                            'user_id' => $record->user_id,
                             'queue_number' => $record->number,
                             'service' => $record->service->name ?? null,
                         ]);
                     })
-                    ->tooltip(fn (Queue $record) => $record->patient_id 
-                        ? "Buat rekam medis untuk {$record->patient->name}" 
+                    ->tooltip(fn (Queue $record) => $record->user_id 
+                        ? "Buat rekam medis untuk {$record->user->name}" 
                         : "Buat rekam medis baru"
                     ),
 

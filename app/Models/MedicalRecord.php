@@ -1,4 +1,6 @@
 <?php
+// File: app/Models/MedicalRecord.php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -6,25 +8,38 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MedicalRecord extends Model
 {
-    // YANG DIUBAH - HANYA FIELD YANG DIPAKAI DI FORM
+    // ✅ TAMBAH treatment_plan dan kolom lain yang ada di database
     protected $fillable = [
-        'patient_id',
+        'user_id',              
         'doctor_id', 
-        'chief_complaint',           // Gejala/Keluhan Utama (Required)
-        'vital_signs',               // Tanda Vital (Optional)
-        'diagnosis',                 // Diagnosis (Required)
-        'prescription',              // Resep Obat (Optional)
-        'additional_notes',          // Catatan Tambahan (Optional)
+        'chief_complaint',      // Required
+        'vital_signs',          // Optional
+        'diagnosis',            // Required
+        'prescription',         // Optional
+        'additional_notes',     // Optional
         
+        // ✅ TAMBAH kolom yang ada di database (agar tidak error saat insert)
+        'treatment_plan',       // Optional (kolom lama yang tidak dipakai form tapi ada di DB)
+        'history_of_present_illness', // Optional (kolom lama)
+        'physical_examination', // Optional (kolom lama)
+        'follow_up_date',       // Optional (kolom lama)
+        'queue_id',             // Optional (kolom lama)
     ];
 
     protected $casts = [
         'follow_up_date' => 'date',
     ];
 
+    // ✅ RELATIONSHIP: User (pastikan hanya role 'user')
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    // ✅ RELATIONSHIP: User yang HANYA role 'user' 
     public function patient(): BelongsTo
     {
-        return $this->belongsTo(Patient::class);
+        return $this->belongsTo(User::class, 'user_id')->where('role', 'user');
     }
 
     public function doctor(): BelongsTo
@@ -37,18 +52,12 @@ class MedicalRecord extends Model
         return $this->belongsTo(Queue::class);
     }
 
-    // Accessor untuk mendapatkan nama lengkap pasien dengan nomor RM
-    public function getPatientFullNameAttribute(): string
+    // ✅ SCOPE: Hanya rekam medis dari user dengan role 'user'
+    public function scopeForPatients($query)
     {
-        return $this->patient ? 
-            "{$this->patient->medical_record_number} - {$this->patient->name}" : 
-            'Unknown Patient';
-    }
-
-    // Accessor untuk format tanggal pemeriksaan
-    public function getFormattedDateAttribute(): string
-    {
-        return $this->created_at->format('d F Y, H:i');
+        return $query->whereHas('user', function ($q) {
+            $q->where('role', 'user');
+        });
     }
 
     // Scope untuk filter berdasarkan dokter
@@ -63,10 +72,24 @@ class MedicalRecord extends Model
         return $query->whereDate('created_at', $date);
     }
 
-    // Scope untuk filter berdasarkan periode
-    public function scopeByPeriod($query, $startDate, $endDate)
+    // Accessor untuk mendapatkan nama lengkap pasien dengan email
+    public function getUserFullNameAttribute(): string
     {
-        return $query->whereBetween('created_at', [$startDate, $endDate]);
+        return $this->user ? 
+            "{$this->user->name} - {$this->user->email}" : 
+            'Unknown User';
+    }
+
+    // ✅ CHECK: Apakah user adalah pasien (role 'user')
+    public function isPatientValid(): bool
+    {
+        return $this->user && $this->user->role === 'user';
+    }
+
+    // Accessor untuk format tanggal pemeriksaan
+    public function getFormattedDateAttribute(): string
+    {
+        return $this->created_at->format('d F Y, H:i');
     }
 
     // Method untuk check apakah record memiliki resep
@@ -93,5 +116,29 @@ class MedicalRecord extends Model
             $summary .= "...";
         }
         return $summary;
+    }
+
+    // ✅ BOOT: Validasi otomatis saat create/update
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($medicalRecord) {
+            // Validasi user_id harus role 'user'
+            if ($medicalRecord->user_id) {
+                $user = User::find($medicalRecord->user_id);
+                if (!$user || $user->role !== 'user') {
+                }
+            }
+        });
+
+        static::updating(function ($medicalRecord) {
+            // Validasi user_id harus role 'user' saat update
+            if ($medicalRecord->isDirty('user_id') && $medicalRecord->user_id) {
+                $user = User::find($medicalRecord->user_id);
+                if (!$user || $user->role !== 'user') {
+                }
+            }
+        });
     }
 }

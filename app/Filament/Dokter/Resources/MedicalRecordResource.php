@@ -1,8 +1,11 @@
 <?php
+// File: app/Filament/Dokter/Resources/MedicalRecordResource.php
+
 namespace App\Filament\Dokter\Resources;
 
 use App\Filament\Dokter\Resources\MedicalRecordResource\Pages;
 use App\Models\MedicalRecord;
+use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -36,18 +39,26 @@ class MedicalRecordResource extends Resource
                     })
                     ->visible(fn () => request()->has('queue_number')),
 
-                // 1. Pasien (Required)
-                Forms\Components\Select::make('patient_id')
+                // 1. Pasien (Required) - FILTER HANYA ROLE USER
+                Forms\Components\Select::make('user_id')
                     ->label('Pasien')
-                    ->relationship('patient', 'name')
+                    ->options(function () {
+                        // ✅ FILTER: Hanya ambil user dengan role 'user'
+                        return User::where('role', 'user')
+                            ->orderBy('name')
+                            ->pluck('name', 'id')
+                            ->map(function ($name, $id) {
+                                $user = User::find($id);
+                                return "{$name} ({$user->email})";
+                            });
+                    })
                     ->required()
                     ->searchable()
                     ->preload()
-                    ->getOptionLabelFromRecordUsing(fn ($record) => "{$record->medical_record_number} - {$record->name}")
-                    ->disabled(fn () => request()->has('patient_id')) // Disable jika auto-populated
-                    ->helperText(fn () => request()->has('patient_id') 
+                    ->disabled(fn () => request()->has('user_id')) // Disable jika auto-populated
+                    ->helperText(fn () => request()->has('user_id') 
                         ? 'Pasien otomatis dipilih dari antrian' 
-                        : null),
+                        : 'Hanya menampilkan user dengan role pasien'),
 
                 // 2. Gejala/Keluhan Utama (Required)
                 Forms\Components\Textarea::make('chief_complaint')
@@ -91,19 +102,20 @@ class MedicalRecordResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('patient.medical_record_number')
-                    ->label('No. RM')
-                    ->searchable()
-                    ->sortable()
-                    ->badge()
-                    ->color('primary')
-                    ->weight('bold'),
-
-                Tables\Columns\TextColumn::make('patient.name')
+                Tables\Columns\TextColumn::make('user.name')
                     ->label('Nama Pasien')
                     ->searchable()
                     ->sortable()
-                    ->weight('semibold'),
+                    ->weight('semibold')
+                    ->description(fn (MedicalRecord $record): string => 
+                        $record->user ? "Email: {$record->user->email}" : 'Tidak ada email'
+                    ),
+
+                Tables\Columns\TextColumn::make('user.phone')
+                    ->label('No. HP')
+                    ->searchable()
+                    ->toggleable()
+                    ->placeholder('Tidak ada'),
 
                 Tables\Columns\TextColumn::make('chief_complaint')
                     ->label('Keluhan Utama')
@@ -141,6 +153,16 @@ class MedicalRecordResource extends Resource
                 Tables\Filters\SelectFilter::make('doctor')
                     ->relationship('doctor', 'name')
                     ->label('Filter Dokter'),
+
+                // ✅ FILTER: Hanya tampilkan rekam medis dari user role 'user'
+                Tables\Filters\SelectFilter::make('user')
+                    ->label('Filter Pasien')
+                    ->options(function () {
+                        return User::where('role', 'user')
+                            ->orderBy('name')
+                            ->pluck('name', 'id');
+                    })
+                    ->searchable(),
 
                 Tables\Filters\Filter::make('today')
                     ->label('Hari Ini')
@@ -193,7 +215,13 @@ class MedicalRecordResource extends Resource
             ])
             ->searchable()
             ->striped()
-            ->paginated([10, 25, 50]);
+            ->paginated([10, 25, 50])
+            // ✅ QUERY MODIFIER: Hanya tampilkan rekam medis dari user role 'user'
+            ->modifyQueryUsing(function ($query) {
+                return $query->whereHas('user', function ($q) {
+                    $q->where('role', 'user');
+                });
+            });
     }
 
     public static function getPages(): array

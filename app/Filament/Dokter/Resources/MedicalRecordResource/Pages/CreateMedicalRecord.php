@@ -1,8 +1,10 @@
 <?php
+// File: app/Filament/Dokter/Resources/MedicalRecordResource/Pages/CreateMedicalRecord.php
+
 namespace App\Filament\Dokter\Resources\MedicalRecordResource\Pages;
 
 use App\Filament\Dokter\Resources\MedicalRecordResource;
-use App\Models\Patient;
+use App\Models\User;
 use App\Models\Queue;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Notifications\Notification;
@@ -33,6 +35,14 @@ class CreateMedicalRecord extends CreateRecord
         // Auto-set doctor_id dengan Auth facade yang sudah di-import
         $data['doctor_id'] = Auth::id();
         
+        // ✅ VALIDASI: Pastikan user_id adalah role 'user'
+        if (isset($data['user_id'])) {
+            $user = User::find($data['user_id']);
+            if (!$user || $user->role !== 'user') {
+                throw new \Exception('Hanya pasien dengan role user yang dapat dibuatkan rekam medis.');
+            }
+        }
+        
         return $data;
     }
 
@@ -41,24 +51,25 @@ class CreateMedicalRecord extends CreateRecord
     {
         parent::mount();
         
-        // Check untuk parameter dari queue
-        $patientId = request()->get('patient_id');
+        // Check untuk parameter dari queue - UBAH dari patient_id ke user_id
+        $userId = request()->get('user_id');
         $queueNumber = request()->get('queue_number');
         $serviceName = request()->get('service');
         
-        if ($patientId) {
-            $patient = Patient::find($patientId);
+        if ($userId) {
+            $user = User::find($userId);
             
-            if ($patient) {
-                // Auto-populate patient field
+            // ✅ VALIDASI: Pastikan user ada dan role-nya 'user'
+            if ($user && $user->role === 'user') {
+                // Auto-populate user field
                 $this->form->fill([
-                    'patient_id' => $patientId,
+                    'user_id' => $userId,
                 ]);
                 
-                // Show notification dengan info pasien
+                // Show notification dengan info user
                 Notification::make()
                     ->title('Pasien Dari Antrian')
-                    ->body("Auto-selected: {$patient->medical_record_number} - {$patient->name}" . 
+                    ->body("Auto-selected: {$user->name} - {$user->email}" . 
                            ($queueNumber ? " (Antrian: {$queueNumber})" : ""))
                     ->success()
                     ->duration(5000)
@@ -68,6 +79,22 @@ class CreateMedicalRecord extends CreateRecord
                 if ($queueNumber) {
                     static::$title = "Rekam Medis - Antrian {$queueNumber}";
                 }
+            } elseif ($user && $user->role !== 'user') {
+                // ✅ WARNING: Jika user bukan role 'user'
+                Notification::make()
+                    ->title('Peringatan')
+                    ->body("User {$user->name} bukan pasien (role: {$user->role}). Silakan pilih pasien yang valid.")
+                    ->warning()
+                    ->duration(8000)
+                    ->send();
+            } else {
+                // ✅ ERROR: Jika user tidak ditemukan
+                Notification::make()
+                    ->title('Error')
+                    ->body("User dengan ID {$userId} tidak ditemukan.")
+                    ->danger()
+                    ->duration(5000)
+                    ->send();
             }
         }
     }
